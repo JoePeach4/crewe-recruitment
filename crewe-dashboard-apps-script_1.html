@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crewe Alexandra Recruitment Dashboard</title>
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+
+.container { display: flex; height: 100vh; background: #f5f5f5; }
+.sidebar { width: 380px; border-right: 1px solid #ddd; display: flex; flex-direction: column; background: white; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.header { padding: 20px; background: white; border-bottom: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.header h1 { margin: 0 0 4px 0; font-size: 20px; font-weight: 600; }
+.header p { margin: 0; font-size: 12px; color: #666; }
+
+.status-bar { padding: 12px 16px; background: #f0f8ff; border-bottom: 1px solid #ddd; font-size: 12px; color: #0066cc; display: flex; align-items: center; gap: 8px; }
+.status-spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid #ddd; border-top-color: #0066cc; border-radius: 50%; animation: spin 0.6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.controls { padding: 12px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid #ddd; }
+
+.search-box { position: relative; }
+.search-box input { width: 100%; padding: 8px 12px 8px 32px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; }
+.search-box input::placeholder { color: #999; }
+.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #999; }
+
+.filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.filter-row select { padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; background: white; }
+
+.player-list { flex: 1; overflow-y: auto; padding: 8px; }
+.player-item { padding: 12px; margin-bottom: 8px; background: white; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; transition: all 0.2s; }
+.player-item:hover { border-color: #0066cc; box-shadow: 0 2px 6px rgba(0,102,204,0.1); }
+.player-item.active { background: #e8f4f8; border: 1px solid #0066cc; }
+
+.player-name { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+.player-info { font-size: 12px; color: #666; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.detail-panel { padding: 20px; overflow-y: auto; background: white; }
+.empty-state { text-align: center; padding: 40px 20px; color: #999; }
+
+.section { margin-bottom: 24px; }
+.section-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+
+.key-info { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.info-card { padding: 12px; background: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 4px; }
+.info-label { font-size: 11px; color: #666; margin-bottom: 4px; }
+.info-value { font-size: 14px; font-weight: 600; color: #0066cc; }
+
+.metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.metric { padding: 8px; background: #f9f9f9; border-radius: 4px; font-size: 11px; }
+.metric-label { color: #666; margin-bottom: 2px; }
+.metric-value { font-size: 13px; font-weight: 600; color: #0066cc; }
+
+.reports-list { display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; }
+.report-item { padding: 10px; background: #f9f9f9; border-left: 3px solid #0066cc; border-radius: 0; font-size: 12px; }
+.report-date { font-weight: 600; margin-bottom: 2px; }
+.report-meta { color: #666; font-size: 11px; }
+
+.no-data { text-align: center; padding: 20px; background: #f9f9f9; border: 1px dashed #ddd; border-radius: 4px; color: #999; font-size: 12px; }
+
+button { padding: 8px 16px; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; transition: 0.2s; }
+button:hover { background: #0052a3; }
+button:disabled { background: #ccc; cursor: not-allowed; }
+
+.refresh-btn { display: flex; align-items: center; gap: 6px; width: 100%; justify-content: center; }
+
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.modal { background: white; padding: 32px; border-radius: 8px; max-width: 500px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+.modal h2 { margin: 0 0 12px 0; font-size: 18px; font-weight: 600; }
+.modal p { margin: 0 0 16px 0; font-size: 13px; color: #666; line-height: 1.5; }
+.modal input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; margin-bottom: 12px; font-family: monospace; }
+.modal button { width: 100%; margin-bottom: 8px; }
+.modal a { color: #0066cc; text-decoration: none; font-size: 12px; }
+.modal a:hover { text-decoration: underline; }
+
+input[type="file"] { display: none; }
+
+@media (max-width: 768px) {
+  .container { flex-direction: column; }
+  .sidebar { width: 100%; height: auto; max-height: 40vh; }
+  .main { flex: 1; }
+}
+</style>
+</head>
+<body>
+
+<div id="api-modal" class="modal-overlay">
+  <div class="modal">
+    <h2>Google Apps Script Setup</h2>
+    <p>This dashboard reads your Google Sheets via a simple API. Follow these steps:</p>
+    <ol style="margin: 0 0 16px 0; padding-left: 20px; font-size: 13px;">
+      <li>Go to <a href="https://script.google.com" target="_blank">script.google.com</a></li>
+      <li>Create a new project</li>
+      <li>Paste the code from <a href="https://pastebin.com/your-link" target="_blank">this gist</a></li>
+      <li>Deploy as Web app (Anyone with link)</li>
+      <li>Copy the deployment URL below</li>
+    </ol>
+    <input type="text" id="script-url" placeholder="Paste your Apps Script deployment URL..." onkeypress="if(event.key==='Enter') saveScriptUrl()">
+    <button onclick="saveScriptUrl()">Connect</button>
+    <p style="font-size: 11px; color: #999; margin-top: 8px;">URL is stored locally in your browser only.</p>
+  </div>
+</div>
+
+<div class="container" style="display: none;" id="app-container">
+  <div class="sidebar">
+    <div class="header">
+      <h1>Recruitment Dashboard</h1>
+      <p id="refresh-time">Loading...</p>
+    </div>
+    
+    <div id="status-bar" class="status-bar" style="display: none;">
+      <span class="status-spinner"></span>
+      <span id="status-text">Syncing data...</span>
+    </div>
+    
+    <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+      <div class="controls">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="search" placeholder="Search players..." onkeyup="filterPlayers()">
+        </div>
+        <div class="filter-row">
+          <select id="position-filter" onchange="filterPlayers()">
+            <option value="">All Positions</option>
+          </select>
+          <select id="sort-by" onchange="filterPlayers()">
+            <option value="priority">Priority Score</option>
+            <option value="age">Age</option>
+            <option value="confidence">Confidence</option>
+          </select>
+        </div>
+        <button class="refresh-btn" id="refresh-btn" onclick="refreshData()">🔄 Refresh Now</button>
+      </div>
+
+      <div class="player-list" id="player-list"></div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div id="detail-content" class="detail-panel">
+      <div class="empty-state">Loading data...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+let playersData = [];
+let reportsData = [];
+let wyscoutData = [];
+
+let scriptUrl = localStorage.getItem('googleAppsScriptUrl');
+
+function saveScriptUrl() {
+  const url = document.getElementById('script-url').value.trim();
+  if (!url) {
+    alert('Please enter the Apps Script URL');
+    return;
+  }
+  
+  localStorage.setItem('googleAppsScriptUrl', url);
+  scriptUrl = url;
+  document.getElementById('api-modal').style.display = 'none';
+  document.getElementById('app-container').style.display = 'flex';
+  loadSheetData();
+}
+
+async function fetchSheetData(type) {
+  const url = `${scriptUrl}?type=${type}`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Failed to fetch ${type}`);
+  return response.json();
+}
+
+async function loadSheetData() {
+  showStatus(true, 'Loading data from Google Sheets...');
+  
+  try {
+    const [players, reports, wyscout] = await Promise.all([
+      fetchSheetData('players'),
+      fetchSheetData('reports'),
+      fetchSheetData('wyscout')
+    ]);
+    
+    playersData = players;
+    reportsData = reports;
+    wyscoutData = wyscout;
+    
+    if (playersData.length === 0) {
+      throw new Error('No data loaded from sheets');
+    }
+    
+    populateFilters();
+    filterPlayers();
+    showStatus(false);
+    updateRefreshTime();
+    
+    console.log(`Loaded: ${playersData.length} players, ${reportsData.length} reports, ${wyscoutData.length} wyscout records`);
+  } catch (error) {
+    console.error('Error loading data:', error);
+    showStatus(false);
+    document.getElementById('detail-content').innerHTML = `
+      <div class="empty-state">
+        <p style="margin-bottom: 12px;">⚠️ Error loading data</p>
+        <p style="font-size: 12px; color: #999; margin: 0;">${error.message}</p>
+        <button onclick="location.reload()" style="margin-top: 12px;">Try Again</button>
+      </div>
+    `;
+  }
+}
+
+function populateFilters() {
+  const positions = [...new Set(playersData.map(p => p.Position).filter(Boolean))].sort();
+  const select = document.getElementById('position-filter');
+  const existing = select.value;
+  select.innerHTML = '<option value="">All Positions</option>';
+  positions.forEach(pos => {
+    const opt = document.createElement('option');
+    opt.value = pos;
+    opt.textContent = pos;
+    select.appendChild(opt);
+  });
+  select.value = existing;
+}
+
+function filterPlayers() {
+  const search = document.getElementById('search').value.toLowerCase();
+  const position = document.getElementById('position-filter').value;
+  const sortBy = document.getElementById('sort-by').value;
+  
+  let filtered = playersData.filter(p => {
+    const matchSearch = !search || p.Player?.toLowerCase().includes(search) || p.Club?.toLowerCase().includes(search);
+    const matchPos = !position || p.Position === position;
+    return matchSearch && matchPos;
+  });
+  
+  filtered.sort((a, b) => {
+    if (sortBy === 'priority') return (parseFloat(b['Live Priority Score']) || 0) - (parseFloat(a['Live Priority Score']) || 0);
+    if (sortBy === 'age') return (parseFloat(a.Age) || 0) - (parseFloat(b.Age) || 0);
+    if (sortBy === 'confidence') return (parseFloat(b['Confidence Score']) || 0) - (parseFloat(a['Confidence Score']) || 0);
+    return 0;
+  });
+  
+  const html = filtered.map(p => `
+    <div class="player-item" onclick="showPlayerDetail('${p.Player.replace(/'/g, "\\'")}')">
+      <div class="player-name">${p.Player}</div>
+      <div class="player-info">
+        <div>${p.Position}</div>
+        <div><strong>${p['Live Priority Score'] || '-'}</strong></div>
+        <div>${p.Club}</div>
+        <div>${getPlayerReports(p.Player).length} reports</div>
+      </div>
+    </div>
+  `).join('');
+  
+  document.getElementById('player-list').innerHTML = html || '<div class="no-data">No players match</div>';
+}
+
+function getPlayerReports(playerName) {
+  return reportsData.filter(r => r.Player === playerName || r['Last Name'] === playerName).sort((a, b) => new Date(b.Date) - new Date(a.Date));
+}
+
+function getPlayerWyscout(playerName) {
+  return wyscoutData.find(w => w.Player === playerName || w.WyscoutUI?.includes(playerName));
+}
+
+function showPlayerDetail(playerName) {
+  const player = playersData.find(p => p.Player === playerName);
+  if (!player) return;
+  
+  const reports = getPlayerReports(playerName);
+  const wyscout = getPlayerWyscout(playerName);
+  
+  let html = `
+    <div class="section">
+      <div style="margin-bottom: 16px;">
+        <h2 style="margin: 0 0 4px 0; font-size: 22px; font-weight: 600;">${player.Player}</h2>
+        <p style="margin: 0; font-size: 13px; color: #666;">${player.Position} • ${player.Club}</p>
+      </div>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">Key Information</div>
+      <div class="key-info">
+        <div class="info-card">
+          <div class="info-label">Playing Level</div>
+          <div class="info-value">${player['Current Playing Level'] || '-'}</div>
+        </div>
+        <div class="info-card">
+          <div class="info-label">Confidence</div>
+          <div class="info-value">${player['Confidence Score'] || '-'}</div>
+        </div>
+        <div class="info-card">
+          <div class="info-label">Age</div>
+          <div class="info-value">${player.Age}</div>
+        </div>
+        <div class="info-card">
+          <div class="info-label">Contract</div>
+          <div class="info-value">${player.Contract || 'N/A'}</div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  if (wyscout) {
+    const metrics = [
+      { key: 'npXG p90 Percentiles', label: 'npxG/90' },
+      { key: 'LAdj xA p90 Percentiles', label: 'xA/90' },
+      { key: 'LAdj Passes p90 Percentiles', label: 'Passes/90' },
+      { key: 'LAdj Passes Completion % Percentiles', label: 'Pass Comp %' },
+      { key: 'LAdj Successful Dribbles p90 Percentiles', label: 'Dribbles/90' },
+      { key: 'LAdj Aerial Duels p90 Percentiles', label: 'Aerial Duels/90' }
+    ];
+    
+    html += '<div class="section"><div class="section-title">Wyscout Percentiles</div><div class="metrics-grid">';
+    metrics.forEach(m => {
+      const val = wyscout[m.key];
+      const pct = val ? Math.round(parseFloat(val) * 100) + '%' : '-';
+      html += `<div class="metric"><div class="metric-label">${m.label}</div><div class="metric-value">${pct}</div></div>`;
+    });
+    html += '</div></div>';
+  }
+  
+  html += `<div class="section">
+    <div class="section-title">Scout Reports (${reports.length})</div>`;
+  
+  if (reports.length === 0) {
+    html += '<div class="no-data">No reports for this player</div>';
+  } else {
+    html += '<div class="reports-list">';
+    reports.slice(0, 20).forEach(r => {
+      html += `
+        <div class="report-item">
+          <div class="report-date">${r['Fixture date'] || 'Date TBD'} vs ${r['Opposition team'] || 'Unknown'}</div>
+          <div class="report-meta">Level: ${r['Current Playing Level'] || '-'} | Weight: ${r['Report Weight'] || '-'} | Scout: ${r['Scout Initials'] || '-'}</div>
+        </div>
+      `;
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+  
+  document.getElementById('detail-content').innerHTML = html;
+  
+  document.querySelectorAll('.player-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.player-item').forEach(el => {
+    if (el.textContent.includes(playerName)) {
+      el.classList.add('active');
+    }
+  });
+}
+
+function showStatus(show, message = '') {
+  const bar = document.getElementById('status-bar');
+  if (show) {
+    bar.style.display = 'flex';
+    document.getElementById('status-text').textContent = message;
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+async function refreshData() {
+  const btn = document.getElementById('refresh-btn');
+  btn.disabled = true;
+  await loadSheetData();
+  btn.disabled = false;
+}
+
+function updateRefreshTime() {
+  const now = new Date();
+  const time = now.toLocaleTimeString();
+  const next = new Date(now.getTime() + 6 * 60 * 60 * 1000).toLocaleTimeString();
+  document.getElementById('refresh-time').textContent = `Last: ${time} | Next: ${next}`;
+}
+
+// Initialize on load
+window.addEventListener('load', () => {
+  if (scriptUrl) {
+    document.getElementById('api-modal').style.display = 'none';
+    document.getElementById('app-container').style.display = 'flex';
+    loadSheetData();
+  }
+  
+  // Auto-refresh every 6 hours
+  setInterval(() => {
+    if (playersData.length > 0) {
+      loadSheetData();
+    }
+  }, 6 * 60 * 60 * 1000);
+});
+</script>
+
+</body>
+</html>
