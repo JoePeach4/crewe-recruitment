@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Crewe Alexandra Recruitment - Migration & Dashboard</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
@@ -160,11 +160,21 @@ async function handleExcelUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
 
+  // Check if XLSX library is loaded
+  if (typeof XLSX === 'undefined') {
+    alert('XLSX library is loading... please wait a moment and try again');
+    return;
+  }
+
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
-      const workbook = XLSX.read(e.target.result, { type: 'binary' });
+      const workbook = XLSX.read(e.target.result, { type: 'array' });
       const sheet = workbook.Sheets['Flagged Players'];
+      if (!sheet) {
+        alert('Could not find "Flagged Players" sheet in Excel file');
+        return;
+      }
       const data = XLSX.utils.sheet_to_json(sheet);
       
       document.getElementById('migration-modal').style.display = 'none';
@@ -176,7 +186,7 @@ async function handleExcelUpload(event) {
       alert(`Error reading Excel file: ${error.message}`);
     }
   };
-  reader.readAsBinaryString(file);
+  reader.readAsArrayBuffer(file);
 }
 
 async function migrateToSupabase(data) {
