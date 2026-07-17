@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crewe Alexandra Recruitment Dashboard</title>
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+
+.container { display: flex; height: 100vh; background: #f5f5f5; }
+.sidebar { width: 380px; border-right: 1px solid #ddd; display: flex; flex-direction: column; background: white; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.header { padding: 20px; background: white; border-bottom: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); position: relative; }
+.header h1 { margin: 0 0 4px 0; font-size: 20px; font-weight: 600; }
+.header p { margin: 0; font-size: 12px; color: #666; }
+
+.status-bar { padding: 12px 16px; background: #e8f5e9; border-bottom: 1px solid #c8e6c9; font-size: 12px; color: #2e7d32; display: flex; align-items: center; gap: 8px; }
+.status-spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid #ddd; border-top-color: #0066cc; border-radius: 50%; animation: spin 0.6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.controls { padding: 12px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid #ddd; }
+
+.search-box { position: relative; }
+.search-box input { width: 100%; padding: 8px 12px 8px 32px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; }
+.search-box input::placeholder { color: #999; }
+.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #999; }
+
+.filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.filter-row select { padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; background: white; }
+
+.player-list { flex: 1; overflow-y: auto; padding: 8px; }
+.player-item { padding: 12px; margin-bottom: 8px; background: white; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; transition: all 0.2s; }
+.player-item:hover { border-color: #0066cc; box-shadow: 0 2px 6px rgba(0,102,204,0.1); }
+.player-item.active { background: #e8f4f8; border: 1px solid #0066cc; }
+
+.player-name { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+.player-info { font-size: 12px; color: #666; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.detail-panel { padding: 20px; overflow-y: auto; background: white; }
+.empty-state { text-align: center; padding: 40px 20px; color: #999; }
+
+.section { margin-bottom: 24px; }
+.section-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+
+.key-info { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.info-card { padding: 12px; background: #f9f9f9; border: 1px solid #e0e0e0; border-radius: 4px; }
+.info-label { font-size: 11px; color: #666; margin-bottom: 4px; }
+.info-value { font-size: 14px; font-weight: 600; color: #0066cc; }
+
+.metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.metric { padding: 8px; background: #f9f9f9; border-radius: 4px; font-size: 11px; }
+.metric-label { color: #666; margin-bottom: 2px; }
+.metric-value { font-size: 13px; font-weight: 600; color: #0066cc; }
+
+.reports-list { display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; }
+.report-item { padding: 10px; background: #f9f9f9; border-left: 3px solid #0066cc; border-radius: 0; font-size: 12px; }
+.report-date { font-weight: 600; margin-bottom: 2px; }
+.report-meta { color: #666; font-size: 11px; }
+
+.no-data { text-align: center; padding: 20px; background: #f9f9f9; border: 1px dashed #ddd; border-radius: 4px; color: #999; font-size: 12px; }
+
+button { padding: 8px 16px; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; transition: 0.2s; }
+button:hover { background: #0052a3; }
+button:disabled { background: #ccc; cursor: not-allowed; }
+
+.refresh-btn { display: flex; align-items: center; gap: 6px; width: 100%; justify-content: center; }
+
+.settings-btn { position: absolute; top: 20px; right: 20px; background: none; border: none; font-size: 20px; cursor: pointer; color: #666; padding: 0; width: 24px; height: 24px; }
+.settings-btn:hover { color: #0066cc; }
+
+input[type="file"] { display: none; }
+
+@media (max-width: 768px) {
+  .container { flex-direction: column; }
+  .sidebar { width: 100%; height: auto; max-height: 40vh; }
+  .main { flex: 1; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="sidebar">
+    <div class="header" style="position: relative;">
+      <button class="settings-btn" onclick="showConnectionStatus()" title="Connection Status">⚙️</button>
+      <h1>Recruitment Dashboard</h1>
+      <p id="refresh-time">Loading from Supabase...</p>
+    </div>
+    
+    <div id="status-bar" class="status-bar">
+      <span class="status-spinner"></span>
+      <span id="status-text">Connected to Supabase</span>
+    </div>
+    
+    <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+      <div class="controls">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="search" placeholder="Search players..." onkeyup="filterPlayers()">
+        </div>
+        <div class="filter-row">
+          <select id="position-filter" onchange="filterPlayers()">
+            <option value="">All Positions</option>
+          </select>
+          <select id="sort-by" onchange="filterPlayers()">
+            <option value="priority">Priority Score</option>
+            <option value="age">Age</option>
+            <option value="confidence">Confidence</option>
+          </select>
+        </div>
+        <button class="refresh-btn" id="refresh-btn" onclick="refreshData()">🔄 Refresh Now</button>
+      </div>
+
+      <div class="player-list" id="player-list"></div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div id="detail-content" class="detail-panel">
+      <div class="empty-state">Select a player to view details</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Supabase config
+const SUPABASE_URL = 'https://daddvbfybikvmgjwgrim.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRhZGR2YmZ5Ymlrdm1nandncmltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNzQ4MzQsImV4cCI6MjA5OTg1MDgzNH0.t7CiXXebMCw3erSdsl9RlArI8MMOUtaRWFGM2kOKmxQ';
+
+let playersData = [];
+let wyscoutData = [];
+
+function supabaseQuery(table, options = {}) {
+  let url = `${SUPABASE_URL}/rest/v1/${table}?`;
+  
+  // Add select
+  url += 'select=*';
+  
+  // Add filters
+  if (options.filter) {
+    url += `&${options.filter}`;
+  }
+  
+  // Add limit
+  url += `&limit=${options.limit || 1000}`;
+  
+  return fetch(url, {
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json'
+    }
+  }).then(r => r.json());
+}
+
+async function loadData() {
+  try {
+    console.log('Loading data from Supabase...');
+    
+    // Load players
+    playersData = await supabaseQuery('players', { limit: 5000 });
+    console.log(`Loaded ${playersData.length} players`);
+    
+    // Load wyscout
+    wyscoutData = await supabaseQuery('wyscout', { limit: 10000 });
+    console.log(`Loaded ${wyscoutData.length} wyscout records`);
+    
+    populateFilters();
+    filterPlayers();
+    updateRefreshTime();
+    
+  } catch (error) {
+    console.error('Error loading data:', error);
+    document.getElementById('detail-content').innerHTML = `
+      <div class="empty-state">
+        <p style="margin-bottom: 12px;">⚠️ Error loading data</p>
+        <p style="font-size: 12px; color: #999; margin: 0;">${error.message}</p>
+        <button onclick="loadData()" style="margin-top: 12px;">Try Again</button>
+      </div>
+    `;
+  }
+}
+
+function populateFilters() {
+  const positions = [...new Set(playersData.map(p => p.position).filter(Boolean))].sort();
+  const select = document.getElementById('position-filter');
+  const existing = select.value;
+  select.innerHTML = '<option value="">All Positions</option>';
+  positions.forEach(pos => {
+    const opt = document.createElement('option');
+    opt.value = pos;
+    opt.textContent = pos;
+    select.appendChild(opt);
+  });
+  select.value = existing;
+}
+
+function filterPlayers() {
+  const search = document.getElementById('search').value.toLowerCase();
+  const position = document.getElementById('position-filter').value;
+  const sortBy = document.getElementById('sort-by').value;
+  
+  let filtered = playersData.filter(p => {
+    const matchSearch = !search || p.player?.toLowerCase().includes(search) || p.club?.toLowerCase().includes(search);
+    const matchPos = !position || p.position === position;
+    return matchSearch && matchPos;
+  });
+  
+  filtered.sort((a, b) => {
+    if (sortBy === 'priority') return (parseFloat(b.live_priority_score) || 0) - (parseFloat(a.live_priority_score) || 0);
+    if (sortBy === 'age') return (parseFloat(a.age) || 0) - (parseFloat(b.age) || 0);
+    if (sortBy === 'confidence') return (parseFloat(b.confidence_score) || 0) - (parseFloat(a.confidence_score) || 0);
+    return 0;
+  });
+  
+  const html = filtered.map(p => `
+    <div class="player-item" onclick="showPlayerDetail('${p.player.replace(/'/g, "\\'")}')">
+      <div class="player-name">${p.player}</div>
+      <div class="player-info">
+        <div>${p.position}</div>
+        <div><strong>${p.live_priority_score || '-'}</strong></div>
+        <div>${p.club}</div>
+        <div>Age: ${p.age || '-'}</div>
+      </div>
+    </div>
+  `).join('');
+  
+  document.getElementById('player-list').innerHTML = html || '<div class="no-data">No players match</div>';
+}
+
+function getPlayerWyscout(playerName) {
+  return wyscoutData.find(w => w.player === playerName || w.wyscoutui?.includes(playerName));
+}
+
+function showPlayerDetail(playerName) {
+  const player = playersData.find(p => p.player === playerName);
+  if (!player) return;
+  
+  const wyscout = getPlayerWyscout(playerName);
+  
+  let html = `
+    <div class="section">
+      <div style="margin-bottom: 16px;">
+        <h2 style="margin: 0 0 4px 0; font-size: 22px; font-weight: 600;">${player.player}</h2>
+        <p style="margin: 0; font-size: 13px; color: #666;">${player.position || '-'} • ${player.club || '-'}</p>
+      </div>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">Key Information</div>
+      <div class="key-info">
+        <div class="info-card">
+          <div class="info-label">Playing Level</div>
+          <div class="info-value">${player.current_playing_level || '-'}</div>
+        </div>
+        <div class="info-card">
+          <div class="info-label">Confidence</div>
+          <div class="info-value">${player.confidence_score || '-'}</div>
+        </div>
+        <div class="info-card">
+          <div class="info-label">Age</div>
+          <div class="info-value">${player.age || '-'}</div>
+        </div>
+        <div class="info-card">
+          <div class="info-label">Contract</div>
+          <div class="info-value">${player.contract || 'N/A'}</div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  if (wyscout) {
+    const metrics = [
+      { key: 'npxg_p90_percentiles', label: 'npxG/90' },
+      { key: 'ladj_xa_p90_percentiles', label: 'xA/90' },
+      { key: 'ladj_passes_p90_percentiles', label: 'Passes/90' },
+      { key: 'ladj_passes_completion_percentiles', label: 'Pass Comp %' },
+      { key: 'ladj_successful_dribbles_p90_percentiles', label: 'Dribbles/90' },
+      { key: 'ladj_aerial_duels_p90_percentiles', label: 'Aerial Duels/90' }
+    ];
+    
+    html += '<div class="section"><div class="section-title">Wyscout Percentiles</div><div class="metrics-grid">';
+    metrics.forEach(m => {
+      const val = wyscout[m.key];
+      const pct = val ? Math.round(parseFloat(val) * 100) + '%' : '-';
+      html += `<div class="metric"><div class="metric-label">${m.label}</div><div class="metric-value">${pct}</div></div>`;
+    });
+    html += '</div></div>';
+  }
+  
+  html += `<div class="section">
+    <div class="section-title">Additional Info</div>
+    <div class="no-data">Scout reports coming soon</div>
+  </div>`;
+  
+  document.getElementById('detail-content').innerHTML = html;
+  
+  document.querySelectorAll('.player-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.player-item').forEach(el => {
+    if (el.textContent.includes(playerName)) {
+      el.classList.add('active');
+    }
+  });
+}
+
+function updateRefreshTime() {
+  const now = new Date();
+  const time = now.toLocaleTimeString();
+  document.getElementById('refresh-time').textContent = `Last: ${time}`;
+}
+
+async function refreshData() {
+  const btn = document.getElementById('refresh-btn');
+  btn.disabled = true;
+  await loadData();
+  btn.disabled = false;
+}
+
+function showConnectionStatus() {
+  alert(`✓ Connected to Supabase\nURL: ${SUPABASE_URL}\n\nPlayers: ${playersData.length}\nWyscout: ${wyscoutData.length}`);
+}
+
+// Load data on page load
+window.addEventListener('load', loadData);
+
+// Auto-refresh every 6 hours
+setInterval(() => {
+  if (playersData.length > 0) {
+    loadData();
+  }
+}, 6 * 60 * 60 * 1000);
+</script>
+
+</body>
+</html>
