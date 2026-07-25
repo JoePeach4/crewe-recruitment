@@ -163,29 +163,36 @@ let selectedPlayer = null;
 
 async function fetchPlayers() {
   try {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/players?select=*`, {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/players?select=*&order=name.asc`, {
       headers: {
         'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
       }
     });
-    allPlayers = await response.json();
+    const data = await response.json();
+    console.log('Players fetched:', data.length || 0, data);
+    allPlayers = data;
     return allPlayers;
   } catch (e) {
     console.error('Error fetching players:', e);
+    document.getElementById('status').textContent = `Error: ${e.message}`;
     return [];
   }
 }
 
 async function fetchReports() {
   try {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/reports?select=*`, {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/reports?select=*&order=fixture_date.desc`, {
       headers: {
         'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
       }
     });
-    allReports = await response.json();
+    const data = await response.json();
+    console.log('Reports fetched:', data.length || 0);
+    allReports = data;
     return allReports;
   } catch (e) {
     console.error('Error fetching reports:', e);
@@ -194,9 +201,23 @@ async function fetchReports() {
 }
 
 function getReportsForPlayer(playerName) {
-  return allReports.filter(r => 
-    r.player_name.toLowerCase() === playerName.toLowerCase()
-  ).sort((a, b) => new Date(b.fixture_date) - new Date(a.fixture_date));
+  try {
+    if (!playerName) return [];
+    return allReports.filter(r => 
+      r.player_name && r.player_name.toLowerCase() === playerName.toLowerCase()
+    ).sort((a, b) => {
+      const dateA = new Date(a.fixture_date || 0);
+      const dateB = new Date(b.fixture_date || 0);
+      return dateB - dateA;
+    });
+  } catch (e) {
+    console.error('Error filtering reports:', e);
+    return [];
+  }
+}
+
+function getPlayerName(player) {
+  return player.player || player.name || player.player_name || player.full_name || 'Unknown';
 }
 
 function renderPlayerList(players) {
@@ -204,10 +225,11 @@ function renderPlayerList(players) {
   const searchTerm = document.getElementById('searchInput').value.toLowerCase();
   const positionFilter = document.getElementById('positionFilter').value;
   
-  let filtered = players.filter(p => 
-    (!searchTerm || p.name?.toLowerCase().includes(searchTerm)) &&
-    (!positionFilter || p.position === positionFilter)
-  );
+  let filtered = players.filter(p => {
+    const name = getPlayerName(p);
+    return (!searchTerm || (name && name.toLowerCase().includes(searchTerm))) &&
+           (!positionFilter || p.position === positionFilter);
+  });
   
   filtered.sort((a, b) => {
     const countA = getReportsForPlayer(a.name).length;
@@ -216,13 +238,19 @@ function renderPlayerList(players) {
   });
   
   list.innerHTML = filtered.map(p => {
-    const reports = getReportsForPlayer(p.name);
+    const name = getPlayerName(p);
+    let reportCount = 0;
+    try {
+      reportCount = getReportsForPlayer(name).length;
+    } catch (e) {
+      console.error('Error counting reports for', name, e);
+    }
     return `
       <div class="player-item ${selectedPlayer?.id === p.id ? 'active' : ''}" onclick="selectPlayer(${JSON.stringify(p).replace(/"/g, '&quot;')})">
-        <div class="player-name">${p.name}</div>
+        <div class="player-name">${name}</div>
         <div class="player-meta">
-          ${p.position || 'Unknown Position'} • Age ${p.age || '?'}
-          <span class="report-count">${reports.length}</span>
+          ${p.position || 'Pos?'} • ${p.age || '?'}
+          <span class="report-count">${reportCount}</span>
         </div>
       </div>
     `;
@@ -235,11 +263,12 @@ function renderPlayerList(players) {
 
 function selectPlayer(player) {
   selectedPlayer = player;
-  const reports = getReportsForPlayer(player.name);
+  const name = getPlayerName(player);
+  const reports = getReportsForPlayer(name);
   
   document.getElementById('noPlayerSelected').style.display = 'none';
   document.getElementById('playerDetail').style.display = 'block';
-  document.getElementById('playerTitle').textContent = player.name;
+  document.getElementById('playerTitle').textContent = name;
   
   // Update stats
   document.getElementById('reportCount').textContent = reports.length;
@@ -265,16 +294,17 @@ function selectPlayer(player) {
 function renderReports(reports) {
   const container = document.getElementById('reportsList');
   
-  if (reports.length === 0) {
+  if (!reports || reports.length === 0) {
     container.innerHTML = '<div class="empty-state">No reports found for this player</div>';
     return;
   }
   
-  container.innerHTML = reports.map(r => `
+  try {
+    container.innerHTML = reports.map(r => `
     <div class="report-card">
       <div class="report-header">
-        <div class="report-scout">${r.scout_first_name || ''} ${r.scout_last_name || ''}</div>
-        <div class="report-date">${new Date(r.fixture_date).toLocaleDateString()}</div>
+        <div class="report-scout">${(r.scout_first_name || '') + ' ' + (r.scout_last_name || '')}</div>
+        <div class="report-date">${r.fixture_date ? new Date(r.fixture_date).toLocaleDateString() : 'N/A'}</div>
       </div>
       
       <div class="report-position">
@@ -297,6 +327,10 @@ function renderReports(reports) {
       ${r.report_weight ? `<div class="report-weight">Weight: ${(r.report_weight * 100).toFixed(1)}%</div>` : ''}
     </div>
   `).join('');
+  } catch (e) {
+    console.error('Error rendering reports:', e);
+    container.innerHTML = '<div class="empty-state">Error loading reports</div>';
+  }
 }
 
 function getVerdictClass(verdict) {
@@ -323,12 +357,21 @@ document.getElementById('positionFilter').addEventListener('change', () => {
 });
 
 async function init() {
-  document.getElementById('status').textContent = 'Loading...';
+  document.getElementById('status').textContent = 'Connecting...';
   
   const players = await fetchPlayers();
-  const reports = await fetchReports();
+  console.log('Players loaded:', players.length);
   
-  document.getElementById('status').textContent = `${players.length} players • ${reports.length} reports`;
+  const reports = await fetchReports();
+  console.log('Reports loaded:', reports.length);
+  
+  if (players.length === 0 && reports.length === 0) {
+    document.getElementById('status').textContent = 'No data found';
+  } else if (players.length === 0) {
+    document.getElementById('status').textContent = `${reports.length} reports (no players)`;
+  } else {
+    document.getElementById('status').textContent = `${players.length} players • ${reports.length} reports`;
+  }
   
   renderPlayerList(players);
 }
