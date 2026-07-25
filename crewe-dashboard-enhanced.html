@@ -163,20 +163,31 @@ let selectedPlayer = null;
 
 async function fetchPlayers() {
   try {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/players?select=*&order=name.asc`, {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/players?select=*`, {
       headers: {
         'apikey': SUPABASE_KEY,
         'Authorization': `Bearer ${SUPABASE_KEY}`,
         'Content-Type': 'application/json'
       }
     });
+    
+    if (!response.ok) {
+      console.error('Players response error:', response.status, response.statusText);
+      return [];
+    }
+    
     const data = await response.json();
-    console.log('Players fetched:', data.length || 0, data);
+    console.log('Players fetched:', Array.isArray(data) ? data.length : 'invalid', data);
+    
+    if (!Array.isArray(data)) {
+      console.error('Players data is not an array:', typeof data);
+      return [];
+    }
+    
     allPlayers = data;
     return allPlayers;
   } catch (e) {
     console.error('Error fetching players:', e);
-    document.getElementById('status').textContent = `Error: ${e.message}`;
     return [];
   }
 }
@@ -222,6 +233,13 @@ function getPlayerName(player) {
 
 function renderPlayerList(players) {
   const list = document.getElementById('playerList');
+  
+  if (!players || !Array.isArray(players)) {
+    console.error('renderPlayerList: players is not an array', players);
+    list.innerHTML = '<div class="empty-state">No players data</div>';
+    return;
+  }
+  
   const searchTerm = document.getElementById('searchInput').value.toLowerCase();
   const positionFilter = document.getElementById('positionFilter').value;
   
