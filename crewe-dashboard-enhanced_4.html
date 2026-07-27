@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crewe Alexandra Recruitment Dashboard</title>
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+
+.container { display: flex; height: 100vh; background: #f5f5f5; }
+.sidebar { width: 340px; border-right: 1px solid #ddd; display: flex; flex-direction: column; background: white; overflow: hidden; }
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.header { padding: 18px; background: white; border-bottom: 1px solid #ddd; }
+.header h1 { margin: 0 0 4px 0; font-size: 20px; font-weight: 600; }
+.header p { margin: 0; font-size: 12px; color: #666; }
+
+.controls { padding: 10px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid #ddd; }
+.search-box input { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; }
+.filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.filter-row select { padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; }
+
+.player-list { flex: 1; overflow-y: auto; padding: 6px; }
+.player-item { padding: 10px; margin-bottom: 6px; background: white; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; transition: all 0.2s; }
+.player-item:hover { border-color: #0066cc; background: #f9f9f9; }
+.player-item.active { background: #e8f4f8; border-color: #0066cc; }
+
+.player-name { font-weight: 600; font-size: 12px; }
+.player-meta { font-size: 11px; color: #666; margin-top: 3px; }
+.report-count { display: inline-block; background: #0066cc; color: white; padding: 2px 6px; border-radius: 2px; font-size: 10px; font-weight: 600; }
+
+.detail-panel { padding: 24px; overflow-y: auto; background: white; }
+.detail-panel h2 { margin: 0 0 16px 0; font-size: 22px; font-weight: 600; }
+
+.tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid #eee; }
+.tab { padding: 10px 16px; cursor: pointer; font-size: 13px; border-bottom: 2px solid transparent; color: #666; }
+.tab.active { border-bottom-color: #0066cc; color: #0066cc; font-weight: 600; }
+
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+.player-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+.stat-card { padding: 12px; background: linear-gradient(135deg, #0066cc, #0052a3); color: white; border-radius: 4px; text-align: center; }
+.stat-card .label { font-size: 11px; opacity: 0.9; }
+.stat-card .value { font-size: 20px; font-weight: 600; margin-top: 4px; }
+
+.reports-container { }
+.report-card { padding: 14px; background: #f9f9f9; border: 1px solid #e0e0e0; border-left: 4px solid #0066cc; border-radius: 4px; margin-bottom: 12px; }
+.report-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.report-scout { font-weight: 600; font-size: 12px; }
+.report-date { font-size: 11px; color: #666; }
+.report-position { display: inline-block; background: #e3f2fd; color: #1976d2; padding: 2px 6px; border-radius: 2px; font-size: 10px; margin-top: 4px; }
+
+.report-details { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 10px 0; font-size: 11px; }
+.detail-item { }
+.detail-label { color: #666; margin-bottom: 2px; }
+.detail-value { font-weight: 600; }
+
+.verdict-badge { display: inline-block; padding: 4px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; margin-top: 8px; }
+.verdict-sign { background: #c8e6c9; color: #2e7d32; }
+.verdict-watch { background: #fff3cd; color: #856404; }
+.verdict-forget { background: #f8d7da; color: #721c24; }
+.verdict-squad { background: #d1ecf1; color: #0c5460; }
+
+.report-weight { font-size: 10px; color: #0066cc; font-weight: 600; margin-top: 8px; }
+.report-comments { font-size: 11px; margin-top: 8px; padding: 8px; background: white; border-radius: 3px; max-height: 80px; overflow-y: auto; }
+
+.empty-state { text-align: center; padding: 40px 20px; color: #999; }
+.loading { text-align: center; padding: 20px; color: #999; }
+
+button { padding: 8px 16px; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; }
+button:hover { background: #0052a3; }
+button:disabled { background: #ccc; cursor: not-allowed; }
+
+@media (max-width: 768px) {
+  .container { flex-direction: column; }
+  .sidebar { width: 100%; height: 30vh; }
+  .player-stats { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="header">
+      <h1>Recruitment</h1>
+      <p id="status">Loading...</p>
+    </div>
+    
+    <div class="controls">
+      <input type="text" id="searchInput" placeholder="Search players..." class="search-box">
+      <select id="positionFilter">
+        <option value="">All Positions</option>
+        <option value="Goalkeeper">Goalkeeper</option>
+        <option value="Centre Back">Centre Back</option>
+        <option value="Full Back">Full Back</option>
+        <option value="Centre Midfielder">Centre Midfielder</option>
+        <option value="Attacking Midfielder">Attacking Midfielder</option>
+        <option value="Wide Forward">Wide Forward</option>
+        <option value="Centre Forward">Centre Forward</option>
+      </select>
+    </div>
+    
+    <div class="player-list" id="playerList"></div>
+  </div>
+
+  <!-- Main Panel -->
+  <div class="main">
+    <div class="detail-panel">
+      <div id="noPlayerSelected" class="empty-state">
+        <p>Select a player to view reports</p>
+      </div>
+      
+      <div id="playerDetail" style="display: none;">
+        <h2 id="playerTitle"></h2>
+        
+        <div class="player-stats">
+          <div class="stat-card">
+            <div class="label">Reports</div>
+            <div class="value" id="reportCount">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Avg Level</div>
+            <div class="value" id="avgLevel">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Avg Verdict</div>
+            <div class="value" id="avgVerdict">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Confidence</div>
+            <div class="value" id="confidence">-</div>
+          </div>
+        </div>
+        
+        <div class="tabs">
+          <div class="tab active" onclick="switchTab('reports')">Reports</div>
+          <div class="tab" onclick="switchTab('analysis')">Analysis</div>
+        </div>
+        
+        <div id="reports" class="tab-content active">
+          <div class="reports-container" id="reportsList"></div>
+        </div>
+        
+        <div id="analysis" class="tab-content">
+          <div id="analysisContent"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://daddvbfybikvmgjwgrim.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRhZGR2YmZ5Ymlrdm1nandncmltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNzQ4MzQsImV4cCI6MjA5OTg1MDgzNH0.t7CiXXebMCw3erSdsl9RlArI8MMOUtaRWFGM2kOKmxQ';
+
+let allPlayers = [];
+let allReports = [];
+let selectedPlayer = null;
+
+async function fetchPlayers() {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/players?limit=5000`, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      console.error('Players response error:', response.status, response.statusText);
+      const errorData = await response.json();
+      console.error('Error details:', errorData);
+      return [];
+    }
+    
+    const data = await response.json();
+    console.log('Players fetched:', Array.isArray(data) ? data.length : 'invalid');
+    console.log('Sample player:', data[0]);
+    
+    if (!Array.isArray(data)) {
+      console.error('Players data is not an array:', typeof data);
+      return [];
+    }
+    
+    allPlayers = data;
+    return allPlayers;
+  } catch (e) {
+    console.error('Error fetching players:', e);
+    return [];
+  }
+}
+
+async function fetchReports() {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/reports?limit=6000`, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await response.json();
+    console.log('Reports fetched:', Array.isArray(data) ? data.length : 0);
+    
+    if (!Array.isArray(data)) {
+      console.error('Reports data is not an array:', data);
+      return [];
+    }
+    
+    allReports = data;
+    return allReports;
+  } catch (e) {
+    console.error('Error fetching reports:', e);
+    return [];
+  }
+}
+
+function getReportsForPlayer(playerName) {
+  try {
+    if (!playerName) return [];
+    return allReports.filter(r => 
+      r.player_name && r.player_name.toLowerCase() === playerName.toLowerCase()
+    ).sort((a, b) => {
+      const dateA = new Date(a.fixture_date || 0);
+      const dateB = new Date(b.fixture_date || 0);
+      return dateB - dateA;
+    });
+  } catch (e) {
+    console.error('Error filtering reports:', e);
+    return [];
+  }
+}
+
+function getPlayerName(player) {
+  return player.player || player.name || player.player_name || player.full_name || 'Unknown';
+}
+
+function renderPlayerList(players) {
+  const list = document.getElementById('playerList');
+  
+  if (!players || !Array.isArray(players)) {
+    console.error('renderPlayerList: players is not an array', players);
+    list.innerHTML = '<div class="empty-state">No players data</div>';
+    return;
+  }
+  
+  const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+  const positionFilter = document.getElementById('positionFilter').value;
+  
+  let filtered = players.filter(p => {
+    const name = getPlayerName(p);
+    return (!searchTerm || (name && name.toLowerCase().includes(searchTerm))) &&
+           (!positionFilter || p.position === positionFilter);
+  });
+  
+  filtered.sort((a, b) => {
+    const countA = getReportsForPlayer(a.name).length;
+    const countB = getReportsForPlayer(b.name).length;
+    return countB - countA;
+  });
+  
+  list.innerHTML = filtered.map(p => {
+    const name = getPlayerName(p);
+    let reportCount = 0;
+    try {
+      reportCount = getReportsForPlayer(name).length;
+    } catch (e) {
+      console.error('Error counting reports for', name, e);
+    }
+    return `
+      <div class="player-item ${selectedPlayer?.id === p.id ? 'active' : ''}" onclick="selectPlayer(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+        <div class="player-name">${name}</div>
+        <div class="player-meta">
+          ${p.position || 'Pos?'} • ${p.age || '?'}
+          <span class="report-count">${reportCount}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="empty-state">No players found</div>';
+  }
+}
+
+function selectPlayer(player) {
+  selectedPlayer = player;
+  const name = getPlayerName(player);
+  const reports = getReportsForPlayer(name);
+  
+  document.getElementById('noPlayerSelected').style.display = 'none';
+  document.getElementById('playerDetail').style.display = 'block';
+  document.getElementById('playerTitle').textContent = name;
+  
+  // Update stats
+  document.getElementById('reportCount').textContent = reports.length;
+  
+  if (reports.length > 0) {
+    const avgCurrent = reports.filter(r => r.current_playing_level).length > 0
+      ? reports.map(r => r.current_playing_level).join(', ')
+      : '-';
+    document.getElementById('avgLevel').textContent = avgCurrent.split(',')[0].trim();
+    
+    const verdicts = reports.map(r => r.verdict).filter(Boolean);
+    const verdictScore = verdicts.length > 0 ? (verdicts.filter(v => v === 'Sign').length / verdicts.length * 100).toFixed(0) + '%' : '-';
+    document.getElementById('avgVerdict').textContent = verdictScore;
+    
+    const confidence = Math.min(100, reports.length * 10).toFixed(0) + '%';
+    document.getElementById('confidence').textContent = confidence;
+  }
+  
+  renderReports(reports);
+  renderPlayerList(allPlayers);
+}
+
+function renderReports(reports) {
+  const container = document.getElementById('reportsList');
+  
+  if (!reports || reports.length === 0) {
+    container.innerHTML = '<div class="empty-state">No reports found for this player</div>';
+    return;
+  }
+  
+  try {
+    container.innerHTML = reports.map(r => `
+    <div class="report-card">
+      <div class="report-header">
+        <div class="report-scout">${(r.scout_first_name || '') + ' ' + (r.scout_last_name || '')}</div>
+        <div class="report-date">${r.fixture_date ? new Date(r.fixture_date).toLocaleDateString() : 'N/A'}</div>
+      </div>
+      
+      <div class="report-position">
+        ${r.report_position} ${r.form_id ? '| ' + r.form_id : ''}
+      </div>
+      
+      <div class="report-details">
+        <div class="detail-item">
+          <div class="detail-label">Current Level</div>
+          <div class="detail-value">${r.current_playing_level || 'N/A'}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Potential Level</div>
+          <div class="detail-value">${r.potential_playing_level || 'N/A'}</div>
+        </div>
+      </div>
+      
+      ${r.verdict ? `<div class="verdict-badge verdict-${getVerdictClass(r.verdict)}">${r.verdict}</div>` : ''}
+      
+      ${r.report_weight ? `<div class="report-weight">Weight: ${(r.report_weight * 100).toFixed(1)}%</div>` : ''}
+    </div>
+  `).join('');
+  } catch (e) {
+    console.error('Error rendering reports:', e);
+    container.innerHTML = '<div class="empty-state">Error loading reports</div>';
+  }
+}
+
+function getVerdictClass(verdict) {
+  const v = verdict.toLowerCase();
+  if (v.includes('sign') || v.includes('number 1')) return 'sign';
+  if (v.includes('squad') || v.includes('watch again')) return 'watch';
+  if (v.includes('forget')) return 'forget';
+  return 'squad';
+}
+
+function switchTab(tabName) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(tabName).classList.add('active');
+  event.target.classList.add('active');
+}
+
+document.getElementById('searchInput').addEventListener('input', () => {
+  renderPlayerList(allPlayers);
+});
+
+document.getElementById('positionFilter').addEventListener('change', () => {
+  renderPlayerList(allPlayers);
+});
+
+async function init() {
+  document.getElementById('status').textContent = 'Connecting...';
+  
+  const players = await fetchPlayers();
+  console.log('Players loaded:', players.length);
+  
+  const reports = await fetchReports();
+  console.log('Reports loaded:', reports.length);
+  
+  if (players.length === 0 && reports.length === 0) {
+    document.getElementById('status').textContent = 'No data found';
+  } else if (players.length === 0) {
+    document.getElementById('status').textContent = `${reports.length} reports (no players)`;
+  } else {
+    document.getElementById('status').textContent = `${players.length} players • ${reports.length} reports`;
+  }
+  
+  renderPlayerList(players);
+}
+
+init();
+</script>
+</body>
+</html>
