@@ -1,0 +1,23 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-primary: #0066cc;
+  --color-success: #4caf50;
+  --color-warning: #ff9800;
+  --color-danger: #f44336;
+  --color-bg-light: #f5f5f5;
+  --color-card: #ffffff;
+  --color-ink: #333333;
+  --color-muted: #666666;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg-light);
+  color: var(--color-ink);
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+}
+
+#root {
+  min-height: 100svh;
+}
