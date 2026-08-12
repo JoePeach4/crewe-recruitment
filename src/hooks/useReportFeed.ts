@@ -23,10 +23,13 @@ export function useReportFeed(): UseReportFeedResult {
     async function loadInitial() {
       setLoading(true)
       setError(null)
+      // id as a tiebreaker: bulk-imported rows often share an identical
+      // created_at timestamp, which otherwise makes their order arbitrary.
       const { data, error: fetchError } = await supabase
         .from('reports')
         .select('*')
         .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
         .limit(FEED_SIZE)
 
       if (cancelled) return
