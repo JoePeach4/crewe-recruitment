@@ -14,6 +14,14 @@ const POSITIONS = [
   'Centre Forward',
 ]
 
+type SortOption = 'reports' | 'priority' | 'confidence'
+
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: 'reports', label: 'Report count' },
+  { value: 'priority', label: 'Priority' },
+  { value: 'confidence', label: 'Confidence' },
+]
+
 interface PlayerListProps {
   players: Player[]
   reports: Report[]
@@ -32,6 +40,7 @@ export default function PlayerList({
   const [searchInput, setSearchInput] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [position, setPosition] = useState('All')
+  const [sortBy, setSortBy] = useState<SortOption>('reports')
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchInput), 300)
@@ -48,11 +57,16 @@ export default function PlayerList({
 
   const filteredPlayers = useMemo(() => {
     const query = debouncedSearch.trim().toLowerCase()
+    const sortValue = (p: Player): number => {
+      if (sortBy === 'priority') return p.live_priority_score ?? -Infinity
+      if (sortBy === 'confidence') return p.confidence_score ?? -Infinity
+      return reportCounts.get(p.player) ?? 0
+    }
     return players
       .filter((p) => (query ? p.player.toLowerCase().includes(query) : true))
       .filter((p) => (position === 'All' ? true : p.position === position))
-      .sort((a, b) => (reportCounts.get(b.player) ?? 0) - (reportCounts.get(a.player) ?? 0))
-  }, [players, debouncedSearch, position, reportCounts])
+      .sort((a, b) => sortValue(b) - sortValue(a))
+  }, [players, debouncedSearch, position, sortBy, reportCounts])
 
   return (
     <div className="flex flex-col h-full">
@@ -72,6 +86,17 @@ export default function PlayerList({
           {POSITIONS.map((pos) => (
             <option key={pos} value={pos}>
               {pos}
+            </option>
+          ))}
+        </select>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as SortOption)}
+          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
+        >
+          {SORT_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              Sort: {opt.label}
             </option>
           ))}
         </select>
@@ -105,7 +130,19 @@ export default function PlayerList({
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-medium text-sm text-ink truncate">{player.player}</span>
-                      <Badge variant="primary">{reportCounts.get(player.player) ?? 0}</Badge>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {sortBy === 'priority' && (
+                          <Badge variant="neutral">
+                            {player.live_priority_score != null ? player.live_priority_score.toFixed(1) : '—'}
+                          </Badge>
+                        )}
+                        {sortBy === 'confidence' && (
+                          <Badge variant="neutral">
+                            {player.confidence_score != null ? player.confidence_score.toFixed(1) : '—'}
+                          </Badge>
+                        )}
+                        <Badge variant="primary">{reportCounts.get(player.player) ?? 0}</Badge>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                       {player.position && <Badge variant="neutral">{player.position}</Badge>}

@@ -1,0 +1,16 @@
+{
+  "name": "crewe-webhook-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "webhook-server.js",
+  "scripts": {
+    "start": "node webhook-server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}

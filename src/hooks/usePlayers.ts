@@ -21,6 +21,8 @@ const UNASSIGNED_PLAYER: Player = {
   contract_status: null,
   age: null,
   scout_summary: null,
+  confidence_score: null,
+  live_priority_score: null,
 }
 
 export function usePlayers(): UsePlayersResult {

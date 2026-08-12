@@ -11,6 +11,8 @@ export const mockPlayers: Player[] = [
     contract_status: 'Contracted',
     age: 21,
     scout_summary: null,
+    confidence_score: 5.2,
+    live_priority_score: 3.1,
   },
   {
     id: 2,
@@ -22,6 +24,8 @@ export const mockPlayers: Player[] = [
     contract_status: null,
     age: null,
     scout_summary: null,
+    confidence_score: null,
+    live_priority_score: null,
   },
 ]
 
@@ -41,7 +45,8 @@ export const mockReports: Report[] = [
     verdict: 'Sign for first team',
     scout_rating: 1,
     report_weight: 0.9,
-    scout_comments: 'Strong engine, good on the ball.',
+    team: 'crewe alexandra',
+    opposition_team: 'newport county',
   },
   {
     id: 102,
@@ -58,7 +63,8 @@ export const mockReports: Report[] = [
     verdict: 'Watch again - ASAP',
     scout_rating: 1,
     report_weight: 0.6,
-    scout_comments: null,
+    team: 'crewe alexandra',
+    opposition_team: 'salford city',
   },
 ]
 

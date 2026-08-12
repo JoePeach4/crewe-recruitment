@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Dashboard from './pages/Dashboard'
+import ReportFeed from './pages/ReportFeed'
 import { ToastProvider } from './components/ui/Toast'
 
 function App() {
@@ -9,6 +10,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/player/:playerName" element={<Dashboard />} />
+          <Route path="/feed" element={<ReportFeed />} />
         </Routes>
       </ToastProvider>
     </BrowserRouter>

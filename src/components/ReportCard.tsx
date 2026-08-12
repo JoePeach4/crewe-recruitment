@@ -13,9 +13,10 @@ interface ReportCardProps {
   report: Report
   isUnassigned: boolean
   onEdit: (report: Report) => void
+  showPlayerName?: boolean
 }
 
-export default function ReportCard({ report, isUnassigned, onEdit }: ReportCardProps) {
+export default function ReportCard({ report, isUnassigned, onEdit, showPlayerName }: ReportCardProps) {
   return (
     <div
       className={`p-3 rounded-lg border ${
@@ -24,12 +25,20 @@ export default function ReportCard({ report, isUnassigned, onEdit }: ReportCardP
     >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <div className="font-semibold text-sm text-ink">
+          {showPlayerName && (
+            <div className="font-semibold text-sm text-ink">{report.player_name}</div>
+          )}
+          <div className={showPlayerName ? 'text-xs text-muted mt-0.5' : 'font-semibold text-sm text-ink'}>
             {formatScoutName(report.scout_first_name, report.scout_last_name)}
           </div>
           <div className="text-xs text-muted mt-0.5">
             {formatDate(report.fixture_date)} · {report.report_position ?? '—'}
           </div>
+          {(report.team || report.opposition_team) && (
+            <div className="text-xs text-muted mt-0.5 capitalize">
+              {report.team ?? '—'} vs {report.opposition_team ?? '—'}
+            </div>
+          )}
         </div>
         {report.verdict && (
           <Badge variant={verdictVariant[getVerdictBucket(report.verdict) ?? ''] ?? 'neutral'}>
@@ -58,10 +67,6 @@ export default function ReportCard({ report, isUnassigned, onEdit }: ReportCardP
           </div>
         )}
       </div>
-
-      {report.scout_comments && (
-        <p className="mt-2 text-sm text-ink/80 whitespace-pre-line">{report.scout_comments}</p>
-      )}
 
       {isUnassigned && (
         <button

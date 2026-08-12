@@ -27,6 +27,8 @@ export interface Player {
   contract_status: string | null
   age: number | null
   scout_summary: string | null
+  confidence_score: number | null
+  live_priority_score: number | null
   sofascore_stats?: Record<string, SofascoreStat> | null
 }
 
@@ -51,7 +53,8 @@ export interface Report {
   verdict: string | null
   scout_rating: number | null
   report_weight: number | null
-  scout_comments: string | null
+  team: string | null
+  opposition_team: string | null
 }
 
 export interface LevelResult {

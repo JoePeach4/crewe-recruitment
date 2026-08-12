@@ -26,7 +26,8 @@ function makeReport(overrides: Partial<Report>): Report {
     verdict: 'Sign for first team',
     scout_rating: 1,
     report_weight: 1,
-    scout_comments: null,
+    team: 'crewe alexandra',
+    opposition_team: 'newport county',
     ...overrides,
   }
 }
