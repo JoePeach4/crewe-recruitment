@@ -10,7 +10,9 @@ if (!JOTFORM_API_KEY || !SUPABASE_URL || !SUPABASE_KEY) {
   process.exit(1)
 }
 
-// Field IDs are identical across all 7 forms (verified directly against JotForm).
+// Field IDs are identical across all 7 forms EXCEPT the "Player" field,
+// which is 57 on Goalkeeper/Centre Back and 56 everywhere else (verified
+// directly against each form's question schema via the JotForm API).
 const FORM_POSITIONS = {
   '222285725346358': 'Goalkeeper',
   '221034419719050': 'Centre Back',
@@ -19,6 +21,16 @@ const FORM_POSITIONS = {
   '222372072545351': 'Attacking Midfielder',
   '222372120671345': 'Wide Forward',
   '222372051361344': 'Centre Forward',
+}
+
+const PLAYER_FIELD_ID = {
+  '222285725346358': '57', // Goalkeeper
+  '221034419719050': '57', // Centre Back
+  '222285688293367': '56', // Full Back
+  '221114334342340': '56', // Centre Midfielder
+  '222372072545351': '56', // Attacking Midfielder
+  '222372120671345': '56', // Wide Forward
+  '222372051361344': '56', // Centre Forward
 }
 
 const supabaseHeaders = {
@@ -71,7 +83,7 @@ async function fetchSubmission(submissionId) {
 async function parseSubmission(sub, formId, position) {
   const ans = sub.answers || {}
 
-  const player = ans['56']?.answer ?? 'Unknown'
+  const player = ans[PLAYER_FIELD_ID[formId] ?? '56']?.answer ?? 'Unknown'
   const dateStr = parseDate(ans['18']?.answer)
   const current = ans['48']?.answer
   const potential = ans['49']?.answer
@@ -106,6 +118,7 @@ async function parseSubmission(sub, formId, position) {
   return Object.fromEntries(Object.entries(report).filter(([, v]) => v !== null && v !== undefined))
 }
 
+// Returns true if a new row was inserted, false if skipped as a duplicate.
 async function insertReport(report) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/reports`, {
     method: 'POST',
@@ -115,12 +128,13 @@ async function insertReport(report) {
 
   if (res.status === 409) {
     console.log(`⚠ Duplicate submission ignored: ${report.jotform_submission_id}`)
-    return
+    return false
   }
   if (!res.ok) {
     const body = await res.text()
     throw new Error(`Supabase insert failed (${res.status}): ${body}`)
   }
+  return true
 }
 
 const app = express()
@@ -146,10 +160,12 @@ app.post('/webhook/jotform', async (req, res) => {
 
     const sub = await fetchSubmission(submissionId)
     const report = await parseSubmission(sub, formId, position)
-    await insertReport(report)
+    const inserted = await insertReport(report)
 
-    console.log(`✓ Report inserted: ${report.player_name} (${position})`)
-    res.status(200).json({ ok: true })
+    if (inserted) {
+      console.log(`✓ Report inserted: ${report.player_name} (${position})`)
+    }
+    res.status(200).json({ ok: true, inserted })
   } catch (err) {
     console.error('✗ Webhook error:', err)
     // 200 to avoid JotForm retry storms; the error is logged for visibility.
